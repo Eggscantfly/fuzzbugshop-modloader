@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+    <link href="styles/style.css" rel="stylesheet">
+    <script src="./libs/phaser-2.6.2.js" type="text/javascript"></script>
+    <script src="./libs/particle-storm-scrambled.js" type="text/javascript"></script>
+    <script src="./app.min.js"></script>
+    <title>Fuzz Bugs Factory Hop</title>
+    <style>
+        .ad { display: none !important; }
+        body { margin: 0; overflow: hidden; background: #000; }
+        #modMenu {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85); border: 1px solid #888; padding: 15px;
+            color: #fff; font-family: monospace; font-size: 13px; z-index: 9999;
+            min-width: 200px; display: none;
+        }
+        #modMenu .title { color: #aaa; margin-bottom: 10px; font-size: 12px; }
+        #modMenu .opt { padding: 6px 0; cursor: pointer; border-bottom: 1px solid #333; }
+        #modMenu .opt:hover { color: #0ff; }
+        #modMenu .val { color: #0f0; float: right; }
+        #modMenu .close { color: #f66; margin-top: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="contentWrapper" class="transparent">
+        <div id="splash"></div>
+        <div id="innerWrapper" class="hidden">
+            <div id="gameWrapper" class="gameWrapper"></div>
+        </div>
+    </div>
+    <div id="modMenu"></div>
+    
+    <script>
+    window.ModAPI = {
+        game: null,
+        playScene: null,
+        _updateCbs: [],
+        _renderCbs: [],
+        _keyCbs: {},
+        
+        onUpdate: function(fn) { this._updateCbs.push(fn); },
+        onRender: function(fn) { this._renderCbs.push(fn); },
+        onKey: function(key, fn) { this._keyCbs[key.toUpperCase()] = fn; },
+        getPlayer: function() { return this.playScene ? this.playScene.Ah : null; },
+        getScene: function() { return this.playScene; },
+        setConfig: function(k, v) { if (FuzzbugHop && FuzzbugHop.config) FuzzbugHop.config[k] = v; },
+        getConfig: function(k) { return FuzzbugHop && FuzzbugHop.config ? FuzzbugHop.config[k] : null; },
+        log: function(m) { console.log('[mod] ' + m); }
+    };
+    
+    window.ModMenu = {
+        visible: false,
+        opts: [],
+        
+        toggle: function() {
+            this.visible = !this.visible;
+            document.getElementById('modMenu').style.display = this.visible ? 'block' : 'none';
+            this.render();
+        },
+        
+        addOption: function(name, getter, setter) {
+            this.opts.push({ name: name, get: getter, set: setter });
+        },
+        
+        addToggle: function(name, getter, setter) {
+            this.opts.push({ 
+                name: name, 
+                get: function() { return getter() ? 'ON' : 'OFF'; },
+                set: function() { setter(!getter()); }
+            });
+        },
+        
+        render: function() {
+            var h = '<div class="title">mods [TAB]</div>';
+            this.opts.forEach(function(o, i) {
+                h += '<div class="opt" onclick="ModMenu.click(' + i + ')">' + o.name + '<span class="val">' + o.get() + '</span></div>';
+            });
+            h += '<div class="close" onclick="ModMenu.toggle()">close</div>';
+            document.getElementById('modMenu').innerHTML = h;
+        },
+        
+        click: function(i) { this.opts[i].set(); this.render(); }
+    };
+    
+    var content = document.getElementById('contentWrapper');
+    var splash = document.getElementById('splash');
+    var inner = document.getElementById('innerWrapper');
+
+    setTimeout(function() {
+        content.className = 'opaque fadeIn';
+        setTimeout(function() {
+            splash.parentElement.removeChild(splash);
+            inner.className = 'visible';
+            window.loadgame();
+            content.className = 'opaque fadeIn';
+            
+            var setup = function() {
+                if (!window.game) { setTimeout(setup, 50); return; }
+                
+                ModAPI.game = window.game;
+                
+                var oc = game.state.states.PlayScene.create;
+                game.state.states.PlayScene.create = function() {
+                    oc.call(this);
+                    ModAPI.playScene = this;
+                };
+                
+                var ou = game.state.states.PlayScene.update;
+                game.state.states.PlayScene.update = function() {
+                    ou.call(this);
+                    ModAPI._updateCbs.forEach(function(fn) { try { fn(); } catch(e) {} });
+                };
+                
+                var or = game.state.states.PlayScene.render || function(){};
+                game.state.states.PlayScene.render = function() {
+                    or.call(this);
+                    ModAPI._renderCbs.forEach(function(fn) { try { fn(); } catch(e) {} });
+                };
+                
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Tab') { e.preventDefault(); ModMenu.toggle(); }
+                    var k = e.key.toUpperCase();
+                    if (ModAPI._keyCbs[k]) ModAPI._keyCbs[k](e);
+                });
+                
+                if (window.LOADED_JS_MODS) {
+                    window.LOADED_JS_MODS.forEach(function(m) {
+                        try { eval(m.content); } catch(e) { console.error(m.name, e); }
+                    });
+                }
+            };
+            setup();
+        }, 100);
+    }, 100);
+    </script>
+</body>
+</html>

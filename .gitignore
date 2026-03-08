@@ -1,0 +1,20 @@
+# Game assets (copyrighted - do not commit)
+app.min.js
+app.js
+assets/
+img/
+libs/
+styles/
+*.png
+*.jpg
+*.mp3
+*.ogg
+*.wav
+
+# Build outputs
+*.zip
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
